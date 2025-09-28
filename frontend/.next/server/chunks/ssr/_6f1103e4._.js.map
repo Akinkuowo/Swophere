@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 7, "column": 0}, "map": {"version":3,"sources":["file:///Users/greatware/Desktop/All%20Folders/Projects/Swophere/frontend/src/app/layout.tsx"],"sourcesContent":["// src/app/layout.tsx\nimport { nunito } from '../lib/fonts';  // Correct import path from src/app to src/lib\nimport './globals.css';\n\nexport const metadata = {\n  title: 'LetSwap',\n  description: 'Trade and exchange skills without cash',\n};\n\nexport default function RootLayout({\n  children,\n}: {\n  children: React.ReactNode;\n}) {\n  return (\n    <html lang=\"en\" className={nunito.variable}>\n      <body className=\"font-nunito\">\n        {children}\n      </body>\n    </html>\n  );\n}"],"names":[],"mappings":"AAAA,qBAAqB;;;;;;;;;;;;;;AAId,MAAM,WAAW;IACtB,OAAO;IACP,aAAa;AACf;AAEe,SAAS,WAAW,EACjC,QAAQ,EAGT;IACC,qBACE,8OAAC;QAAK,MAAK;QAAK,WAAW,OAAO,QAAQ;kBACxC,cAAA,8OAAC;YAAK,WAAU;sBACb;;;;;;;;;;;AAIT","debugId":null}},
+    {"offset": {"line": 48, "column": 0}, "map": {"version":3,"sources":["file:///Users/greatware/Desktop/All%20Folders/Projects/Swophere/frontend/node_modules/next/src/server/route-modules/app-page/vendored/rsc/react-jsx-dev-runtime.ts"],"sourcesContent":["module.exports = require('../../module.compiled').vendored[\n  'react-rsc'\n].ReactJsxDevRuntime\n"],"names":["module","exports","require","vendored","ReactJsxDevRuntime"],"mappings":";AAAAA,OAAOC,OAAO,GAAGC,QAAQ,4HAAyBC,QAAQ,CACxD,YACD,CAACC,kBAAkB","ignoreList":[0],"debugId":null}}]
+}
