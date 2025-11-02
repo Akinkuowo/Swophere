@@ -1,7 +1,11 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/agreement/[agreementId]/page": "app/agreement/[agreementId]/page.js",
+  "/agreement/create/page": "app/agreement/create/page.js",
+  "/agreement/page": "app/agreement/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/my-profile/page": "app/my-profile/page.js",
+  "/messages/page": "app/messages/page.js",
   "/page": "app/page.js",
-  "/signup/page": "app/signup/page.js"
+  "/swap/[swapId]/page": "app/swap/[swapId]/page.js"
 }

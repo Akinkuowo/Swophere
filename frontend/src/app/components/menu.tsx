@@ -6,36 +6,254 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
-import { Bell, Layers, User, List, Mail, Power } from 'lucide-react';
-
-// Update your User interface in components/Menu.tsx and other files
+import { Bell, Layers, User, List, Mail, Power, MessageCircle, Package, CheckCircle, XCircle } from 'lucide-react';
 
 export interface User {
-    userId: string;
-    firstName: string;
-    lastName: string;
-    username: string;
-    email: string;
-    phone?: string;
-    dateOfBirth?: string;
-    country?: string;
-    state?: string;
-    address?: string;
-    facebook?: string;
-    twitter?: string;
-    linkedin?: string;
-    instagram?: string;
-  }
+  userId: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  phone?: string;
+  dateOfBirth?: string;
+  country?: string;
+  state?: string;
+  address?: string;
+  facebook?: string;
+  twitter?: string;
+  linkedin?: string;
+  instagram?: string;
+}
+
+interface Notification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  relatedId?: string;
+  relatedUsername?: string;
+  metadata?: {
+    senderName?: string;
+    messagePreview?: string;
+    swapTitle?: string;
+  };
+  isRead: boolean;
+  createdAt: string;
+}
 
 interface MenuProps {
   user: User | null;
 }
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 export default function Menu({ user }: MenuProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // Fetch notifications on component mount and when user changes
+  useEffect(() => {
+    if (user?.username) {
+      fetchNotifications();
+      // Set up polling for new notifications every 30 seconds
+      const interval = setInterval(() => {
+        fetchUnreadCount();
+      }, 30000);
+
+      return () => clearInterval(interval);
+    }
+  }, [user?.username]);
+
+  const fetchNotifications = async () => {
+    if (!user?.username) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `${API_BASE_URL}/api/notifications/${user.username}?limit=10&unreadOnly=false`
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    if (!user?.username) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/notifications/${user.username}/unread-count`
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setUnreadCount(data.unreadCount);
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read
+    if (!notification.isRead) {
+      try {
+        await fetch(`${API_BASE_URL}/api/notifications/${notification.id}/read`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: user?.username
+          })
+        });
+
+        // Update local state
+        setNotifications(prev =>
+          prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+
+    // Navigate based on notification type
+    if (notification.type === 'MESSAGE' && notification.relatedUsername) {
+      router.push(`/messages?user=${notification.relatedUsername}`);
+    } else if (notification.type === 'SWAP_INTEREST' && notification.relatedId) {
+      router.push(`/swaps/${notification.relatedId}`);
+    } else if (notification.type === 'SWAP_APPROVED' && notification.relatedId) {
+      router.push(`/swaps/${notification.relatedId}`);
+    } else if (notification.type === 'SWAP_REJECTED' && notification.relatedId) {
+      router.push(`/my-listing`);
+    }
+
+    setIsNotificationsOpen(false);
+  };
+
+  const markAllAsRead = async () => {
+    if (!user?.username) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/notifications/${user.username}/mark-all-read`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    if (!user?.username) return;
+
+    const result = await Swal.fire({
+      title: 'Clear All Notifications?',
+      text: 'This will delete all your notifications permanently.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#6b21a8',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, clear all!'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/notifications/${user.username}/clear-all`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          setNotifications([]);
+          setUnreadCount(0);
+          Swal.fire('Cleared!', 'All notifications have been deleted.', 'success');
+        }
+      } catch (error) {
+        console.error('Error clearing notifications:', error);
+        Swal.fire('Error', 'Failed to clear notifications.', 'error');
+      }
+    }
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'MESSAGE':
+        return <MessageCircle size={18} className="text-blue-600" />;
+      case 'SWAP_INTEREST':
+        return <Package size={18} className="text-purple-600" />;
+      case 'SWAP_APPROVED':
+        return <CheckCircle size={18} className="text-green-600" />;
+      case 'SWAP_REJECTED':
+        return <XCircle size={18} className="text-red-600" />;
+      default:
+        return <Bell size={18} className="text-gray-600" />;
+    }
+  };
+
+  const getNotificationBgColor = (type: string) => {
+    switch (type) {
+      case 'MESSAGE':
+        return 'bg-blue-100';
+      case 'SWAP_INTEREST':
+        return 'bg-purple-100';
+      case 'SWAP_APPROVED':
+        return 'bg-green-100';
+      case 'SWAP_REJECTED':
+        return 'bg-red-100';
+      default:
+        return 'bg-gray-100';
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   const handleLogout = () => {
     Swal.fire({
@@ -55,23 +273,6 @@ export default function Menu({ user }: MenuProps) {
       }
     });
   };
-
-  const notifications = [
-    {
-      id: 1,
-      type: 'success',
-      icon: '✓',
-      message: 'Your Listing Burger House (MG Road) Has Been Approved!',
-      time: '2 hours ago'
-    },
-    {
-      id: 2,
-      type: 'info',
-      icon: '✉️',
-      message: 'You Have 7 Unread Messages',
-      time: '5 hours ago'
-    }
-  ];
 
   return (
     <header className="bg-white shadow-lg sticky top-0 z-50">
@@ -121,45 +322,113 @@ export default function Menu({ user }: MenuProps) {
             {/* Notifications */}
             <div className="relative">
               <button
-                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                onClick={() => {
+                  setIsNotificationsOpen(!isNotificationsOpen);
+                  if (!isNotificationsOpen) {
+                    fetchNotifications();
+                  }
+                }}
                 className="cursor-pointer p-2 text-gray-600 hover:text-purple-600 relative"
               >
                 <Bell size={20} />
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  2
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
 
               {/* Notifications Dropdown */}
               {isNotificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                  <div className="p-4 border-b border-gray-200">
-                    <h3 className="font-semibold text-gray-800">You Have 2 Notifications</h3>
+                <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                  <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                    <h3 className="font-semibold text-gray-800">
+                      Notifications {unreadCount > 0 && `(${unreadCount})`}
+                    </h3>
+                    {notifications.length > 0 && (
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                        >
+                          Mark all read
+                        </button>
+                        <span className="text-gray-300">|</span>
+                        <button
+                          onClick={clearAllNotifications}
+                          className="text-xs text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="max-h-60 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50">
-                        <div className="flex items-start space-x-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            notification.type === 'success' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'
-                          }`}>
-                            {notification.icon}
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-800">{notification.message}</p>
-                            <span className="text-xs text-gray-500">{notification.time}</span>
+                  <div className="max-h-96 overflow-y-auto">
+                    {loading ? (
+                      <div className="p-8 text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                        <p className="text-gray-500 text-sm mt-2">Loading notifications...</p>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <Bell size={48} className="mx-auto text-gray-300 mb-4" />
+                        <p className="text-gray-500">No notifications yet</p>
+                        <p className="text-sm text-gray-400 mt-1">
+                          You'll be notified about messages and swap updates here
+                        </p>
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          onClick={() => handleNotificationClick(notification)}
+                          className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition duration-200 ${
+                            !notification.isRead ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getNotificationBgColor(notification.type)}`}>
+                              {getNotificationIcon(notification.type)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start">
+                                <p className={`text-sm ${!notification.isRead ? 'font-semibold text-gray-900' : 'text-gray-800'}`}>
+                                  {notification.title}
+                                </p>
+                                {!notification.isRead && (
+                                  <span className="ml-2 w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                {notification.message}
+                              </p>
+                              {notification.metadata?.messagePreview && (
+                                <p className="text-xs text-gray-500 mt-1 italic line-clamp-1">
+                                  "{notification.metadata.messagePreview}"
+                                </p>
+                              )}
+                              <span className="text-xs text-gray-500 mt-1 block">
+                                {formatTimestamp(notification.createdAt)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                   
-                  <div className="p-4 text-center border-t border-gray-200">
-                    <Link href="/notifications" className="text-purple-600 hover:text-purple-700 font-medium">
-                      View All Notifications
-                    </Link>
-                  </div>
+                  {notifications.length > 0 && (
+                    <div className="p-4 text-center border-t border-gray-200">
+                      <Link 
+                        href="/notifications" 
+                        className="text-purple-600 hover:text-purple-700 font-medium text-sm"
+                        onClick={() => setIsNotificationsOpen(false)}
+                      >
+                        View All Notifications
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

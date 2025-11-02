@@ -14,34 +14,51 @@ enum SwapStatus {
   CANCELLED
 }
 
+// Add this to your schema.prisma file
+
+model Notification {
+  id               String   @id @default(uuid())
+  userId           String   // Username of the recipient
+  type             String   // MESSAGE, SWAP_INTEREST, SWAP_APPROVED, SWAP_REJECTED, etc.
+  title            String   // Notification title
+  message          String   // Notification message content
+  relatedId        String?  // ID of related entity (message id, swap id, etc.)
+  relatedUsername  String?  // Username of related user (message sender, etc.)
+  metadata         Json?    // Additional data (message preview, etc.)
+  isRead           Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+
 model User {
-  id           String   @id @default(cuid())
-  userId       String   @unique @map("user_id")
-  firstName    String   @map("first_name")
-  lastName     String   @map("last_name")
-  username     String   @unique
-  email        String   @unique
-  password     String
-  phone        String?
-  dateOfBirth  String?  @map("date_of_birth")
-  country      String?
-  state        String?
-  address      String?
-  facebook     String?
-  twitter      String?
-  linkedin     String?
-  instagram    String?
-  isVerified   Boolean  @default(false)
-  verificationToken String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  lastLogin    DateTime?
-
-  // relations
-  login        Login?
-  swaps        Swap[]   // 👈 opposite relation added
-
-  @@map("register")
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  firstName          String
+  lastName           String
+  username           String   @unique
+  email              String   @unique
+  password           String
+  phone              String?
+  dateOfBirth        String?
+  country            String?
+  state              String?
+  address            String?
+  facebook           String?
+  twitter            String?
+  linkedin           String?
+  instagram          String?
+  isVerified         Boolean  @default(false)
+  verificationToken  String?
+  lastLogin          DateTime?
+  createdAt          DateTime @default(now())
+  swaps              Swap[]
+  login              Login?
+  
+  @@map("users")
 }
 
 model Login {
@@ -54,27 +71,28 @@ model Login {
   @@map("login")
 }
 
-model Swap {
-  id          Int     @id @default(autoincrement())
-  listing_id  String  @unique
-  title       String
-  name        String
-  category    String
-  country     String
-  city        String
-  image_name  String
-  amount      Float
-  currency    String
-  description String
-  trending    Boolean   @default(false)
-  status      SwapStatus @default(PENDING)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [userId])
+model Swap {
+  id               Int       @id @default(autoincrement())
+  listing_id       String    @unique
+  title            String
+  name             String
+  category         String
+  country          String
+  city             String
+  image_name       String
+  description      String
+  trending         Boolean   @default(false)
+  status           SwapStatus @default(PENDING)
+  interested_swaps Json?     // Store multiple interested swaps as JSON
+  
+  userId   String
+  user     User    @relation(fields: [userId], references: [userId])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
 
 model ReviewCount {
   id      String @id @default(cuid())
@@ -82,4 +100,40 @@ model ReviewCount {
   num     Int    @default(0)
 
   @@map("review_count")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  fromUser  String
+  toUser    String
+  message   String
+  read      Boolean  @default(false)
+  timestamp DateTime @default(now())
+
+  @@map("messages")
+}
+
+model SwopAgreement {
+  id                 String   @id @default(cuid())
+  swop_id            String   @unique
+  from_user          String
+  to_user            String
+  agreement_status   String   @default("pending")
+  agreement_title    String
+  agreement_type     String   @default("skill_swap")
+  terms              String
+  timeline_days      Int
+  meeting_location   String?
+  communication_method String?
+  dispute_resolution String?
+  confidentiality    Boolean  @default(true)
+  termination_clause String?
+  special_conditions String?
+  skills             Json     // Store skills array as JSON
+  from_user_accepted Boolean  @default(false)
+  to_user_accepted   Boolean  @default(false)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("swop_agreement")
 }

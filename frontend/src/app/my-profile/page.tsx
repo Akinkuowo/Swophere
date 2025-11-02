@@ -7,8 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Menu from '../components/menu';
 import Footer from '../components/footer'; 
-import { User } from '../components/menu';
-import { User2, Mail, Phone, Calendar, MapPin, Home, Facebook, Twitter, Linkedin, Instagram, Edit } from 'lucide-react';
+import { User2, Mail, Phone, Calendar, MapPin, Home, Facebook, Twitter, Linkedin, Instagram, Edit, X } from 'lucide-react';
 
 interface UserProfile {
   userId: string;
@@ -27,17 +26,57 @@ interface UserProfile {
   instagram?: string;
 }
 
+interface UpdateProfileForm {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  dateOfBirth: string;
+  country: string;
+  state: string;
+  address: string;
+  facebook: string;
+  twitter: string;
+  linkedin: string;
+  instagram: string;
+}
+
 const API_BASE_URL = 'http://localhost:4000';
+
+const countries = [
+  'USA', 'Canada', 'Mexico', 'Jamaica', 'Australia', 'New Zealand',
+  'Nigeria', 'Ghana', 'South Africa', 'Kenya', 'Ethiopia', 'Egypt',
+  'China', 'India', 'UK', 'Netherlands', 'Italy', 'Germany',
+  'France', 'Greece', 'Poland', 'Finland', 'Austria', 'Denmark',
+  'Sweden', 'Russia', 'Japan', 'Philippines', 'Singapore', 'Indonesia',
+  'Thailand', 'Israel', 'Hong Kong', 'Saudi Arabia', 'Kuwait',
+  'Brazil', 'Argentina', 'Columbia', 'Chile', 'Peru', 'Uruguay',
+  'Morocco', 'Senegal', 'Tunisia', 'Cameroon', 'Zambia', 'Zimbabwe', 'Benin'
+];
 
 export default function MyProfile() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const owner = searchParams.get('owner');
   
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateForm, setUpdateForm] = useState<UpdateProfileForm>({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    dateOfBirth: '',
+    country: '',
+    state: '',
+    address: '',
+    facebook: '',
+    twitter: '',
+    linkedin: '',
+    instagram: ''
+  });
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -57,6 +96,20 @@ export default function MyProfile() {
 
           if (profileData.success) {
             setProfile(profileData.user);
+            // Initialize update form with current data
+            setUpdateForm({
+              firstName: profileData.user.firstName || '',
+              lastName: profileData.user.lastName || '',
+              phone: profileData.user.phone || '',
+              dateOfBirth: profileData.user.dateOfBirth || '',
+              country: profileData.user.country || '',
+              state: profileData.user.state || '',
+              address: profileData.user.address || '',
+              facebook: profileData.user.facebook || '',
+              twitter: profileData.user.twitter || '',
+              linkedin: profileData.user.linkedin || '',
+              instagram: profileData.user.instagram || ''
+            });
           } else {
             console.error('Failed to fetch profile:', profileData.message);
           }
@@ -72,6 +125,53 @@ export default function MyProfile() {
 
     fetchProfileData();
   }, [router, owner]);
+
+  const handleUpdateFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setUpdateForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdateLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/user/profile/update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user?.userId,
+          ...updateForm
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local profile state
+        setProfile(prev => prev ? { ...prev, ...updateForm } : null);
+        // Update user in localStorage
+        const updatedUser = { ...user, ...updateForm };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        setShowUpdateModal(false);
+        alert('Profile updated successfully!');
+      } else {
+        alert(data.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Update profile error:', error);
+      alert('An error occurred while updating profile');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -93,9 +193,12 @@ export default function MyProfile() {
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Profile Not Found</h2>
             <p className="text-gray-600 mb-4">The requested profile could not be loaded.</p>
-            <Link href="/dashboard" className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+            <button 
+              onClick={() => router.push('/dashboard')}
+              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 cursor-pointer"
+            >
               Back to Dashboard
-            </Link>
+            </button>
           </div>
         </div>
         <Footer />
@@ -117,9 +220,9 @@ export default function MyProfile() {
               </h1>
               <nav className="text-sm">
                 <ol className="flex items-center space-x-2">
-                  <li><Link href="/dashboard" className="hover:text-yellow-300">Home</Link></li>
+                  <li><Link href="/dashboard" className="hover:text-yellow-300 cursor-pointer">Home</Link></li>
                   <li className="before:content-['/'] before:mx-2">
-                    <Link href="/dashboard" className="hover:text-yellow-300">Dashboard</Link>
+                    <Link href="/dashboard" className="hover:text-yellow-300 cursor-pointer">Dashboard</Link>
                   </li>
                   <li className="before:content-['/'] before:mx-2">Profile</li>
                 </ol>
@@ -142,23 +245,6 @@ export default function MyProfile() {
 
               {/* Profile Content */}
               <div className="p-6">
-                {/* Profile Photo Section - Uncomment if you want to add photo upload */}
-                {/* <div className="text-center mb-8">
-                  <div className="relative inline-block">
-                    <img 
-                      src="/images/user-avatar.jpg" 
-                      alt="Profile" 
-                      className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
-                    />
-                    {isOwner && (
-                      <label className="absolute bottom-0 right-0 bg-purple-600 text-white p-2 rounded-full cursor-pointer hover:bg-purple-700">
-                        <Edit size={16} />
-                        <input type="file" className="hidden" />
-                      </label>
-                    )}
-                  </div>
-                </div> */}
-
                 {/* Profile Information */}
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -309,13 +395,13 @@ export default function MyProfile() {
                 {/* Update Profile Button (only show for own profile) */}
                 {isOwner && (
                   <div className="text-center mt-8">
-                    <Link 
-                      href="/update-profile"
-                      className="bg-purple-600 text-yellow-400 px-8 py-3 rounded-lg hover:bg-purple-700 inline-flex items-center font-semibold"
+                    <button 
+                      onClick={() => setShowUpdateModal(true)}
+                      className="bg-purple-600 text-yellow-400 px-8 py-3 rounded-lg hover:bg-purple-700 inline-flex items-center font-semibold cursor-pointer"
                     >
                       <Edit className="mr-2" size={20} />
                       Update Profile
-                    </Link>
+                    </button>
                   </div>
                 )}
               </div>
@@ -325,6 +411,205 @@ export default function MyProfile() {
       </main>
 
       <Footer />
+
+      {/* Update Profile Modal */}
+      {showUpdateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold text-gray-800">Update Profile</h2>
+              <button 
+                onClick={() => setShowUpdateModal(false)}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateProfile} className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* First Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={updateForm.firstName}
+                    onChange={handleUpdateFormChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+
+                {/* Last Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={updateForm.lastName}
+                    onChange={handleUpdateFormChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={updateForm.phone}
+                    onChange={handleUpdateFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+
+                {/* Date of Birth */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    value={updateForm.dateOfBirth}
+                    onChange={handleUpdateFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+
+                {/* Country */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Country
+                  </label>
+                  <select
+                    name="country"
+                    value={updateForm.country}
+                    onChange={handleUpdateFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  >
+                    <option value="">Select Country</option>
+                    {countries.map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* State */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={updateForm.state}
+                    onChange={handleUpdateFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Home Address
+                </label>
+                <textarea
+                  name="address"
+                  value={updateForm.address}
+                  onChange={handleUpdateFormChange}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                />
+              </div>
+
+              {/* Social Media */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Facebook
+                  </label>
+                  <input
+                    type="url"
+                    name="facebook"
+                    value={updateForm.facebook}
+                    onChange={handleUpdateFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Twitter
+                  </label>
+                  <input
+                    type="url"
+                    name="twitter"
+                    value={updateForm.twitter}
+                    onChange={handleUpdateFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    LinkedIn
+                  </label>
+                  <input
+                    type="url"
+                    name="linkedin"
+                    value={updateForm.linkedin}
+                    onChange={handleUpdateFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Instagram
+                  </label>
+                  <input
+                    type="url"
+                    name="instagram"
+                    value={updateForm.instagram}
+                    onChange={handleUpdateFormChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  />
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+                
+                <button
+                  type="button"
+                  onClick={() => setShowUpdateModal(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateLoading}
+                  className="bg-purple-600 text-yellow-400 px-6 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 cursor-pointer"
+                >
+                  {updateLoading ? 'Updating...' : 'Update Profile'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
